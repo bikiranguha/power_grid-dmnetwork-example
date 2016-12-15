@@ -1,6 +1,6 @@
 static char help[] = "Power grid stability analysis of a large power system.\n\
 The base case is the WECC 9 bus system based on the example given in the book Power\n\
-Systems Dynamics and Stability (Chapter 7) by P. Sauer and M. A. Pai.\n\ \n\
+Systems Dynamics and Stability (Chapter 7) by P. Sauer and M. A. Pai.\n\
 The base power grid in this example consists of 9 buses (nodes), 3 generators,\n\
 3 loads, and 9 transmission lines. The network equations are written\n\
 in current balance form using rectangular coordiantes. \n\
@@ -25,52 +25,51 @@ Input parameters include:\n\
 #include <petscksp.h>
 
 typedef struct {
-  PetscInt id; /* Bus Number or extended bus name*/
-  PetscScalar 	mbase; /* MVA base of the machine */
-  PetscScalar PG; /* Generator active power output */
-  PetscScalar QG; /* Generator reactive power output */
-/* Generator constants */
-PetscScalar H;   /* Inertia constant */
-PetscScalar Rs; /* Stator Resistance */
-PetscScalar Xd;  /* d-axis reactance */
-PetscScalar Xdp; /* d-axis transient reactance */
-PetscScalar Xq; /* q-axis reactance Xq(1) set to 0.4360, value given in text 0.0969 */
-PetscScalar Xqp; /* q-axis transient reactance */
-PetscScalar Td0p; /* d-axis open circuit time constant */
-PetscScalar Tq0p; /* q-axis open circuit time constant */
-PetscScalar M; /* M = 2*H/w_s */
-PetscScalar D; /* D = 0.1*M */
-PetscScalar TM; /* Mechanical Torque */
+  PetscInt    id;    /* Bus Number or extended bus name*/
+  PetscScalar mbase; /* MVA base of the machine */
+  PetscScalar PG;    /* Generator active power output */
+  PetscScalar QG;    /* Generator reactive power output */
 
-/* Exciter system constants */
-PetscScalar KA ;  /* Voltage regulartor gain constant */
-PetscScalar TA;     /* Voltage regulator time constant */
-PetscScalar KE;     /* Exciter gain constant */
-PetscScalar TE; /* Exciter time constant */
-PetscScalar KF;  /* Feedback stabilizer gain constant */
-PetscScalar TF;    /* Feedback stabilizer time constant */
-PetscScalar k1;
-PetscScalar k2;  /* k1 and k2 for calculating the saturation function SE = k1*exp(k2*Efd) */
+  /* Generator constants */
+  PetscScalar H;    /* Inertia constant */
+  PetscScalar Rs;   /* Stator Resistance */
+  PetscScalar Xd;   /* d-axis reactance */
+  PetscScalar Xdp;  /* d-axis transient reactance */
+  PetscScalar Xq;   /* q-axis reactance Xq(1) set to 0.4360, value given in text 0.0969 */
+  PetscScalar Xqp;  /* q-axis transient reactance */
+  PetscScalar Td0p; /* d-axis open circuit time constant */
+  PetscScalar Tq0p; /* q-axis open circuit time constant */
+  PetscScalar M;    /* M = 2*H/w_s */
+  PetscScalar D;    /* D = 0.1*M */
+  PetscScalar TM;   /* Mechanical Torque */
 
-PetscScalar Vref;  /* Voltage regulator voltage setpoint */ 
- 
+  /* Exciter system constants */
+  PetscScalar KA ;   /* Voltage regulartor gain constant */
+  PetscScalar TA;    /* Voltage regulator time constant */
+  PetscScalar KE;    /* Exciter gain constant */
+  PetscScalar TE;    /* Exciter time constant */
+  PetscScalar KF;    /* Feedback stabilizer gain constant */
+  PetscScalar TF;    /* Feedback stabilizer time constant */
+  PetscScalar k1,k2; /* calculating the saturation function SE = k1*exp(k2*Efd) */
+
+  PetscScalar Vref;  /* Voltage regulator voltage setpoint */  
 } Gen;
 
 typedef struct {
-  PetscInt    id; /* node id */
-  PetscInt    nofgen;/* Number of generators at the bus*/
-  PetscInt    nofload;/*  Number of load at the bus*/
-  PetscScalar 	yff[2]; /* yff[0]= imaginary part of admittance, yff[1]=real part of admittance*/
-  PetscScalar   vr; /* Real component of bus voltage */
-  PetscScalar   vi; /* Imaginary component of bus voltage */
+  PetscInt    id;      /* node id */
+  PetscInt    nofgen;  /* Number of generators at the bus*/
+  PetscInt    nofload; /*  Number of load at the bus*/
+  PetscScalar  yff[2]; /* yff[0]= imaginary part of admittance, yff[1]=real part of admittance*/
+  PetscScalar  vr;     /* Real component of bus voltage */
+  PetscScalar  vi;     /* Imaginary component of bus voltage */
 } Bus;
 
 typedef struct {
-  PetscInt    id; /* bus id */
+  PetscInt    id;           /* bus id */
   PetscScalar PD0; 
   PetscScalar QD0;
   PetscInt    ld_nsegsp;
-  PetscScalar ld_alphap[3];//ld_alphap=[1,0,0], an array, not a value, so use *ld_alphap;
+  PetscScalar ld_alphap[3]; /* ld_alphap=[1,0,0], an array, not a value, so use *ld_alphap; */
   PetscScalar ld_betap[3];
   PetscInt    ld_nsegsq;
   PetscScalar ld_alphaq[3];
@@ -78,51 +77,41 @@ typedef struct {
 } Load;
 
 typedef struct {
-  PetscInt    id; /* node id */
-  PetscScalar 	yft[2]; /* yft[0]= imaginary part of admittance, yft[1]=real part of admittance*/
+  PetscInt    id;     /* node id */
+  PetscScalar yft[2]; /* yft[0]= imaginary part of admittance, yft[1]=real part of admittance*/
 } Branch;
 
 typedef struct {
   PetscReal   tfaulton,tfaultoff; /* Fault on and off times */
-  PetscInt    faultbus; /* Fault bus */
-  PetscScalar Rfault; /* Fault resistance (pu) */
-  PetscReal   t0,tmax;//t0: initial time,final time
+  PetscInt    faultbus;           /* Fault bus */
+  PetscScalar Rfault;             /* Fault resistance (pu) */
+  PetscReal   t0,tmax;            /* initial time and final time */
   PetscBool   alg_flg;
   PetscReal   t;
-  PetscScalar    ybusfault[180000];  
-  
+  PetscScalar ybusfault[180000];  
 } Userctx;
 
-
-
 /* Used to read data into the DMNetwork components */
-
 #undef __FUNCT__
 #define __FUNCT__ "read_data"
 PetscErrorCode read_data(PetscInt nc, PetscInt ngen, PetscInt nload, PetscInt nbus, PetscInt nbranch, Mat Ybus,Vec V0,Gen **pgen,Load **pload,Bus **pbus, Branch **pbranch, PetscInt **pedgelist)
 {
   PetscErrorCode    ierr;
   PetscInt          i,j,row[1],col[2];
-  //PetscInt          j;
-  Bus              *bus;
+  Bus               *bus;
   Branch            *branch;
   Gen               *gen;
   Load              *load;
   PetscInt          *edgelist;
-  PetscScalar    *varr;
-  PetscScalar M[3], D[3];
-
- 
-  
-    PetscInt nofgen[9] = {1,1,1,0,0,0,0,0,0}; /* Buses at which generators are incident */
-  PetscInt nofload[9] = {0,0,0,0,1,1,0,1,0}; /* Buses at which loads are incident */
-
-
+  PetscScalar       *varr,M[3],D[3];
+  PetscInt          nofgen[9] = {1,1,1,0,0,0,0,0,0}; /* Buses at which generators are incident */
+  PetscInt          nofload[9] = {0,0,0,0,1,1,0,1,0}; /* Buses at which loads are incident */
  
   /*10 parameters*//* Generator real and reactive powers (found via loadflow) */
- // PetscInt gbus[3] = {0,1,2}; /* Buses at which generators are incident */
+  // PetscInt gbus[3] = {0,1,2}; /* Buses at which generators are incident */
   PetscScalar PG[3] = {0.716786142395021,1.630000000000000,0.850000000000000};
   PetscScalar QG[3] = {0.270702180178785,0.066120127797275,-0.108402221791588};
+
   /* Generator constants */
   PetscScalar H[3]    = {23.64,6.4,3.01};   /* Inertia constant */
   PetscScalar Rs[3]   = {0.0,0.0,0.0}; /* Stator Resistance */
@@ -169,148 +158,134 @@ PetscErrorCode read_data(PetscInt nc, PetscInt ngen, PetscInt nload, PetscInt nb
    PetscInt    ld_nsegsq[3] = {3,3,3};
    PetscScalar ld_alphaq[3] = {1,0,0};
    PetscScalar ld_betaq[3]  = {2,1,0};
-   
-   
-  M[0] = 2*H[0]/w_s; M[1] = 2*H[1]/w_s; M[2] = 2*H[2]/w_s;
-  D[0] = 0.1*M[0]; D[1] = 0.1*M[1]; D[2] = 0.1*M[2];
-   
-   
+
+   PetscFunctionBeginUser;
+   M[0] = 2*H[0]/w_s; M[1] = 2*H[1]/w_s; M[2] = 2*H[2]/w_s;
+   D[0] = 0.1*M[0]; D[1] = 0.1*M[1]; D[2] = 0.1*M[2];
   
-  PetscFunctionBeginUser;
-  ierr = PetscCalloc4(nbus*nc,&bus,ngen*nc,&gen,nload*nc,&load,nbranch*nc+(nc-1),&branch);CHKERRQ(ierr);
-  
+   ierr = PetscCalloc4(nbus*nc,&bus,ngen*nc,&gen,nload*nc,&load,nbranch*nc+(nc-1),&branch);CHKERRQ(ierr);
   
    ierr = VecGetArray(V0,&varr);CHKERRQ(ierr);
  
-
- 
-  /* read bus data */
- 
-    for (i = 0; i < nc; i++){
-        for (j = 0; j < nbus; j++) {
-        bus[i*9+j].id  = i*9+j;
-        bus[i*9+j].nofgen=nofgen[j];
-        bus[i*9+j].nofload=nofload[j];
-        bus[i*9+j].vr=varr[2*j];
-        bus[i*9+j].vi=varr[2*j+1];
-        row[0]=2*j;
-        col[0]=2*j;
-        col[1]=2*j+1;
-        ierr=MatGetValues(Ybus,1,row,2,col,bus[i*9+j].yff);CHKERRQ(ierr);//real and imaginary part of admittance from Ybus into yff
-        }
-      
-      }
+   /* read bus data */
+   for (i = 0; i < nc; i++) {
+     for (j = 0; j < nbus; j++) {
+       bus[i*9+j].id  = i*9+j;
+       bus[i*9+j].nofgen=nofgen[j];
+       bus[i*9+j].nofload=nofload[j];
+       bus[i*9+j].vr=varr[2*j];
+       bus[i*9+j].vi=varr[2*j+1];
+       row[0]=2*j;
+       col[0]=2*j;
+       col[1]=2*j+1;
+       ierr=MatGetValues(Ybus,1,row,2,col,bus[i*9+j].yff);CHKERRQ(ierr);//real and imaginary part of admittance from Ybus into yff
+     }    
+   }
   
-    /* read generator data */
-    for (i = 0; i<nc; i++){    
-        for (j = 0; j < ngen; j++) {
-            gen[i*3+j].id  = i*3+j;
-            gen[i*3+j].PG = PG[j];
-            gen[i*3+j].QG = QG[j];
-            gen[i*3+j].H= H[j];
-            gen[i*3+j].Rs= Rs[j];
-            gen[i*3+j].Xd= Xd[j];
-            gen[i*3+j].Xdp= Xdp[j];
-            gen[i*3+j].Xq= Xq[j];
-            gen[i*3+j].Xqp= Xqp[j]; 
-            gen[i*3+j].Td0p= Td0p[j];
-            gen[i*3+j].Tq0p= Tq0p[j];
-            gen[i*3+j].M = M[j];
-            gen[i*3+j].D = D[j];	
+   /* read generator data */
+   for (i = 0; i<nc; i++){    
+     for (j = 0; j < ngen; j++) {
+       gen[i*3+j].id  = i*3+j;
+       gen[i*3+j].PG = PG[j];
+       gen[i*3+j].QG = QG[j];
+       gen[i*3+j].H= H[j];
+       gen[i*3+j].Rs= Rs[j];
+       gen[i*3+j].Xd= Xd[j];
+       gen[i*3+j].Xdp= Xdp[j];
+       gen[i*3+j].Xq= Xq[j];
+       gen[i*3+j].Xqp= Xqp[j]; 
+       gen[i*3+j].Td0p= Td0p[j];
+       gen[i*3+j].Tq0p= Tq0p[j];
+       gen[i*3+j].M = M[j];
+       gen[i*3+j].D = D[j];	
             
-            //exciter system
-            gen[i*3+j].KA= KA[j];
-            gen[i*3+j].TA= TA[j];
-            gen[i*3+j].KE=KE[j];
-            gen[i*3+j].TE=TE[j];
-            gen[i*3+j].KF=KF[j];
-            gen[i*3+j].TF=TF[j];
-            gen[i*3+j].k1=k1[j];
-            gen[i*3+j].k2=k2[j];  
-        } 
-    }
+       /* exciter system */
+       gen[i*3+j].KA= KA[j];
+       gen[i*3+j].TA= TA[j];
+       gen[i*3+j].KE=KE[j];
+       gen[i*3+j].TE=TE[j];
+       gen[i*3+j].KF=KF[j];
+       gen[i*3+j].TF=TF[j];
+       gen[i*3+j].k1=k1[j];
+       gen[i*3+j].k2=k2[j];  
+     } 
+   }
   
-  
-  /* read load data */
-  
-    for (i = 0; i<nc; i++){   
-        for (j = 0; j < nload; j++) {
-            load[i*3+j].id  = i*3+j;
-            load[i*3+j].PD0=PD0[j];
-            load[i*3+j].QD0=QD0[j];
-            load[i*3+j].ld_nsegsp=ld_nsegsp[j];
+   /* read load data */
+   for (i = 0; i<nc; i++){   
+     for (j = 0; j < nload; j++) {
+       load[i*3+j].id  = i*3+j;
+       load[i*3+j].PD0=PD0[j];
+       load[i*3+j].QD0=QD0[j];
+       load[i*3+j].ld_nsegsp=ld_nsegsp[j];
           
-            load[i*3+j].ld_alphap[0]=ld_alphap[0];
-            load[i*3+j].ld_alphap[1]=ld_alphap[1];
-            load[i*3+j].ld_alphap[2]=ld_alphap[2];
+       load[i*3+j].ld_alphap[0]=ld_alphap[0];
+       load[i*3+j].ld_alphap[1]=ld_alphap[1];
+       load[i*3+j].ld_alphap[2]=ld_alphap[2];
           
-            load[i*3+j].ld_alphaq[0]=ld_alphaq[0];
-            load[i*3+j].ld_alphaq[1]=ld_alphaq[1];
-            load[i*3+j].ld_alphaq[2]=ld_alphaq[2];
+       load[i*3+j].ld_alphaq[0]=ld_alphaq[0];
+       load[i*3+j].ld_alphaq[1]=ld_alphaq[1];
+       load[i*3+j].ld_alphaq[2]=ld_alphaq[2];
           
-            load[i*3+j].ld_betap[0]=ld_betap[0];
-            load[i*3+j].ld_betap[1]=ld_betap[1];
-            load[i*3+j].ld_betap[2]=ld_betap[2];
-            load[i*3+j].ld_nsegsq=ld_nsegsq[j];
+       load[i*3+j].ld_betap[0]=ld_betap[0];
+       load[i*3+j].ld_betap[1]=ld_betap[1];
+       load[i*3+j].ld_betap[2]=ld_betap[2];
+       load[i*3+j].ld_nsegsq=ld_nsegsq[j];
 
-            load[i*3+j].ld_betaq[0]=ld_betaq[0];
-            load[i*3+j].ld_betaq[1]=ld_betaq[1];
-            load[i*3+j].ld_betaq[2]=ld_betaq[2];
-        }    
-    }
+       load[i*3+j].ld_betaq[0]=ld_betaq[0];
+       load[i*3+j].ld_betaq[1]=ld_betaq[1];
+       load[i*3+j].ld_betaq[2]=ld_betaq[2];
+     }    
+   }
+   ierr = PetscCalloc1(2*nbranch*nc+2*(nc-1),&edgelist);CHKERRQ(ierr);
 
-    ierr = PetscCalloc1(2*nbranch*nc+2*(nc-1),&edgelist);CHKERRQ(ierr);
-
-
- /* read edgelist */
- 
-    for (i = 0; i<nc; i++){    
-        for (j = 0; j < nbranch; j++) {
-            switch (j) {
-                case 0:
-                    edgelist[i*18+2*j]     = 0+9*i;
-                    edgelist[i*18+2*j + 1] = 3+9*i;
-                    break;
-                case 1:
-                    edgelist[i*18+2*j]     = 1+9*i;
-                    edgelist[i*18+2*j + 1] = 6+9*i;
-                    break;
-                case 2:
-                    edgelist[i*18+2*j]     = 2+9*i;
-                    edgelist[i*18+2*j + 1] = 8+9*i;
-                    break;
-                case 3:
-                    edgelist[i*18+2*j]     = 3+9*i;
-                    edgelist[i*18+2*j + 1] = 4+9*i;
-                    break;
-                case 4:
-                    edgelist[i*18+2*j]     = 3+9*i;
-                    edgelist[i*18+2*j + 1] = 5+9*i;
-                    break;
-                case 5:
-                    edgelist[i*18+2*j]     = 4+9*i;
-                    edgelist[i*18+2*j + 1] = 6+9*i;
-                    break;
-                case 6:
-                    edgelist[i*18+2*j]     = 5+9*i;
-                    edgelist[i*18+2*j + 1] = 8+9*i;
-                    break;
-                case 7:
-                    edgelist[i*18+2*j]     = 6+9*i;
-                    edgelist[i*18+2*j + 1] = 7+9*i;
-                    break;
-                case 8:
-                    edgelist[i*18+2*j]     = 7+9*i;
-                    edgelist[i*18+2*j + 1] = 8+9*i;
-                    break;
-                default:
-                    break;
-            }
-        }
-    }
- 
- 
-  /* for connecting last bus of previous network(9*i-1) to first bus of next network(9*i), the branch admittance=-0.0301407+j17.3611 */
+   /* read edgelist */
+   for (i = 0; i<nc; i++){    
+     for (j = 0; j < nbranch; j++) {
+       switch (j) {
+       case 0:
+         edgelist[i*18+2*j]     = 0+9*i;
+         edgelist[i*18+2*j + 1] = 3+9*i;
+         break;
+       case 1:
+         edgelist[i*18+2*j]     = 1+9*i;
+         edgelist[i*18+2*j + 1] = 6+9*i;
+         break;
+       case 2:
+         edgelist[i*18+2*j]     = 2+9*i;
+         edgelist[i*18+2*j + 1] = 8+9*i;
+         break;
+       case 3:
+         edgelist[i*18+2*j]     = 3+9*i;
+         edgelist[i*18+2*j + 1] = 4+9*i;
+         break;
+       case 4:
+         edgelist[i*18+2*j]     = 3+9*i;
+         edgelist[i*18+2*j + 1] = 5+9*i;
+         break;
+       case 5:
+         edgelist[i*18+2*j]     = 4+9*i;
+         edgelist[i*18+2*j + 1] = 6+9*i;
+         break;
+       case 6:
+         edgelist[i*18+2*j]     = 5+9*i;
+         edgelist[i*18+2*j + 1] = 8+9*i;
+         break;
+       case 7:
+         edgelist[i*18+2*j]     = 6+9*i;
+         edgelist[i*18+2*j + 1] = 7+9*i;
+         break;
+       case 8:
+         edgelist[i*18+2*j]     = 7+9*i;
+         edgelist[i*18+2*j + 1] = 8+9*i;
+         break;
+       default:
+         break;
+       }
+     }
+   }
+   
+   /* for connecting last bus of previous network(9*i-1) to first bus of next network(9*i), the branch admittance=-0.0301407+j17.3611 */
     for (i = 1; i<nc; i++){     
         edgelist[18*nc+2*(i-1)] = 8+(i-1)*9;
         edgelist[18*nc+2*(i-1)+1] = 9*i;
@@ -329,7 +304,7 @@ PetscErrorCode read_data(PetscInt nc, PetscInt ngen, PetscInt nload, PetscInt nb
     }
 
  
- /* read branch data */
+    /* read branch data */
     for (i = 0; i<nc; i++){
         for (j = 0; j < nbranch; j++) {
             branch[i*9+j].id  = i*9+j;
@@ -339,8 +314,7 @@ PetscErrorCode read_data(PetscInt nc, PetscInt ngen, PetscInt nload, PetscInt nb
             ierr=MatGetValues(Ybus,1,row,2,col,branch[i*9+j].yft);CHKERRQ(ierr);//imaginary part of admittance
         }  
     }
-  
-  
+   
    *pgen     =gen;
    *pload    =load;
    *pbus     = bus;
@@ -350,8 +324,6 @@ PetscErrorCode read_data(PetscInt nc, PetscInt ngen, PetscInt nload, PetscInt nb
    ierr = VecRestoreArray(V0,&varr);CHKERRQ(ierr);
    PetscFunctionReturn(0);
 }
-
-
 
 #undef __FUNCT__
 #define __FUNCT__ "SetInitialGuess"
@@ -374,8 +346,6 @@ PetscErrorCode SetInitialGuess(DM networkdm, Vec X)
   PetscScalar    theta,Vd,Vq,SE;
 
   PetscFunctionBegin;
-
-  
   ierr = DMNetworkGetVertexRange(networkdm,&vStart, &vEnd);CHKERRQ(ierr);
 
   ierr = DMGetLocalVector(networkdm,&localX);CHKERRQ(ierr);
@@ -479,8 +449,6 @@ PetscErrorCode ri2dq(PetscScalar Fr,PetscScalar Fi,PetscScalar delta,PetscScalar
   PetscFunctionReturn(0);
 }
 
- 
- 
  /* Computes F(t,U,U_t) where F() = 0 is the DAE to be solved. */
  #undef __FUNCT__
  #define __FUNCT__ "FormIFunction"
@@ -495,10 +463,8 @@ PetscErrorCode ri2dq(PetscScalar Fr,PetscScalar Fi,PetscScalar delta,PetscScalar
   const PetscScalar *xarr,*xdotarr;
   DMNetworkComponentGenericDataType *arr;
   PetscScalar    Vd,Vq,SE;
-    
 	
   PetscFunctionBegin;
- 
   ierr = VecSet(F,0.0);CHKERRQ(ierr);
   
   ierr = TSGetDM(ts,&networkdm);CHKERRQ(ierr);
@@ -529,18 +495,16 @@ PetscErrorCode ri2dq(PetscScalar Fr,PetscScalar Fi,PetscScalar delta,PetscScalar
     Load        *load;
     PetscBool   ghostvtex;
     PetscInt    numComps;
-	PetscScalar Yffr, Yffi;
-	PetscScalar   Vm, Vm2,Vm0;
-	PetscScalar  Vr0=0, Vi0=0;
-	PetscScalar  PD,QD;
+    PetscScalar Yffr, Yffi;
+    PetscScalar   Vm, Vm2,Vm0;
+    PetscScalar  Vr0=0, Vi0=0;
+    PetscScalar  PD,QD;
 
     ierr = DMNetworkIsGhostVertex(networkdm,v,&ghostvtex);CHKERRQ(ierr);  
 	
     ierr = DMNetworkGetNumComponents(networkdm,v,&numComps);CHKERRQ(ierr); 
     ierr = DMNetworkGetVariableOffset(networkdm,v,&offset);CHKERRQ(ierr); 
-	
-	
-	
+		
     for (j = 0; j < numComps; j++) {
         ierr = DMNetworkGetComponentTypeOffset(networkdm,v,j,&key,&offsetd);CHKERRQ(ierr);
         if (key == 1) {  
@@ -758,9 +722,6 @@ PetscErrorCode ri2dq(PetscScalar Fr,PetscScalar Fi,PetscScalar delta,PetscScalar
    
 }
 
-
-
-
 /* This function is used for solving the algebraic system only during fault on and
    off times. It computes the entire F and then zeros out the part corresponding to
    differential equations
@@ -768,12 +729,9 @@ PetscErrorCode ri2dq(PetscScalar Fr,PetscScalar Fi,PetscScalar delta,PetscScalar
 */
  #undef __FUNCT__
 #define __FUNCT__ "AlgFunction"
-
 PetscErrorCode AlgFunction (SNES snes, Vec X, Vec F, void *ctx) 
-
 {
   PetscErrorCode ierr;
- 
   DM             networkdm;
   Vec            localX,localF;
   PetscInt       vfrom,vto,offsetfrom,offsetto;
@@ -785,7 +743,6 @@ PetscErrorCode AlgFunction (SNES snes, Vec X, Vec F, void *ctx)
   DMNetworkComponentGenericDataType *arr;  
 	
   PetscFunctionBegin;
- 
   ierr = VecSet(F,0.0);CHKERRQ(ierr);
   
   ierr = SNESGetDM(snes,&networkdm);CHKERRQ(ierr);
@@ -1024,12 +981,6 @@ PetscErrorCode AlgFunction (SNES snes, Vec X, Vec F, void *ctx)
   PetscFunctionReturn(0);   
 }
   
-  
-
-
-
- 
-
 #undef __FUNCT__
 #define __FUNCT__ "main"
 int main(int argc,char ** argv)
@@ -1056,16 +1007,12 @@ int main(int argc,char ** argv)
    Userctx       user;
    PetscInt    nc = 1;  /* Default no. of copies */ 
 
-
-  
   ierr = PetscInitialize(&argc,&argv,"petscoptions",help);CHKERRQ(ierr);
   ierr = PetscOptionsGetInt(NULL,NULL,"-nc",&nc,NULL);CHKERRQ(ierr);
   ierr = MPI_Comm_size(PETSC_COMM_WORLD,&size);CHKERRQ(ierr);
   ierr = MPI_Comm_rank(PETSC_COMM_WORLD,&rank);CHKERRQ(ierr);
   
-
-
- /* Read initial voltage vector and Ybus */
+  /* Read initial voltage vector and Ybus */
     if (!rank) {
         ngen=3;
         nbus=9;  
@@ -1205,24 +1152,19 @@ int main(int argc,char ** argv)
   ierr = TSSetApplicationContext(ts,&user);CHKERRQ(ierr);
   ierr = TSSetType(ts,TSBEULER);CHKERRQ(ierr);
   ierr = TSSetIFunction(ts,NULL, (TSIFunction) FormIFunction,&user);CHKERRQ(ierr);
-   
-  
-  
+     
   ierr = TSSetDuration(ts,1000,user.tfaulton);CHKERRQ(ierr);
   ierr = TSSetExactFinalTime(ts,TS_EXACTFINALTIME_STEPOVER);CHKERRQ(ierr);
   ierr = TSSetInitialTimeStep(ts,0.0,0.01);CHKERRQ(ierr);
   ierr = TSSetFromOptions(ts);CHKERRQ(ierr);
 
-
   /*user.alg_flg = PETSC_TRUE is the period when fault exists. We add fault admittance to Ybus matrix. eg, fault bus is 8. Y88(new)=Y88(old)+Yfault. */
   user.alg_flg = PETSC_FALSE;
   
   /* Prefault period */
-   ierr = TSSolve(ts,X);CHKERRQ(ierr);
-  
+  ierr = TSSolve(ts,X);CHKERRQ(ierr);
   
   /* Create the nonlinear solver for solving the algebraic system */
- 
   ierr = VecDuplicate(X,&F_alg);CHKERRQ(ierr);
   ierr = TSGetSNES(ts,&snes_alg);CHKERRQ(ierr);
   ierr = SNESSetFunction(snes_alg,F_alg,AlgFunction,&user);CHKERRQ(ierr);
@@ -1237,19 +1179,16 @@ int main(int argc,char ** argv)
   /* Solve the algebraic equations */
   ierr = SNESSolve(snes_alg,NULL,X);CHKERRQ(ierr);
   
- 
   /* Disturbance period */
   ierr = TSSetDuration(ts,1000,user.tfaultoff);CHKERRQ(ierr);
   ierr = TSSetExactFinalTime(ts,TS_EXACTFINALTIME_STEPOVER);CHKERRQ(ierr);
   ierr = TSSetInitialTimeStep(ts,user.tfaulton,.01);CHKERRQ(ierr);
   ierr = TSSetIFunction(ts,NULL, (TSIFunction) FormIFunction,&user);CHKERRQ(ierr);
-
-  
+ 
   user.alg_flg = PETSC_TRUE;
 
   ierr = TSSolve(ts,X);CHKERRQ(ierr);
   
- 
   /* Remove the fault */
   ierr = SNESSetFunction(snes_alg,F_alg,AlgFunction,&user);CHKERRQ(ierr);
   ierr = SNESSetOptionsPrefix(snes_alg,"alg_");CHKERRQ(ierr);
@@ -1270,18 +1209,17 @@ int main(int argc,char ** argv)
 
   ierr = TSSolve(ts,X);CHKERRQ(ierr);
  
-  
-   ierr = VecDestroy(&F_alg);CHKERRQ(ierr);
-   ierr = VecDestroy(&X);CHKERRQ(ierr);
-   ierr = VecDestroy(&Xdot);CHKERRQ(ierr);
-   ierr = VecDestroy(&F);CHKERRQ(ierr);
+  ierr = VecDestroy(&F_alg);CHKERRQ(ierr);
+  ierr = VecDestroy(&X);CHKERRQ(ierr);
+  ierr = VecDestroy(&Xdot);CHKERRQ(ierr);
+  ierr = VecDestroy(&F);CHKERRQ(ierr);
    
-   if (rank == 0){
-       ierr = MatDestroy(&Ybus);CHKERRQ(ierr);
-       ierr = VecDestroy(&V0);CHKERRQ(ierr);
-      }
+  if (rank == 0){
+    ierr = MatDestroy(&Ybus);CHKERRQ(ierr);
+    ierr = VecDestroy(&V0);CHKERRQ(ierr);
+  }
   ierr = DMDestroy(&networkdm);CHKERRQ(ierr);
-  ierr=TSDestroy(&ts); CHKERRQ(ierr);
+  ierr = TSDestroy(&ts); CHKERRQ(ierr);
   ierr = PetscFinalize();
   return(0);
  }
