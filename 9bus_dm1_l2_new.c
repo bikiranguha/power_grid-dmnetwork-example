@@ -1141,11 +1141,7 @@ int main(int argc,char ** argv)
   ierr = TSGetSNES(ts,&snes);CHKERRQ(ierr);
   ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
   ierr = KSPGetPC(ksp,&pc);CHKERRQ(ierr);
-  if (size == 1) {
-    ierr = PCSetType(pc,PCLU);CHKERRQ(ierr);
-  } else {
-    ierr = PCSetType(pc,PCBJACOBI);CHKERRQ(ierr); 
-  }  
+  ierr = PCSetType(pc,PCBJACOBI);CHKERRQ(ierr); 
 
   ierr = TSSetIFunction(ts,NULL,(TSIFunction) FormIFunction,&user);CHKERRQ(ierr);    
   ierr = TSSetDuration(ts,1000,user.tfaulton);CHKERRQ(ierr);
@@ -1179,7 +1175,7 @@ int main(int argc,char ** argv)
   
   /* Solve the algebraic equations */
   if (!rank) {
-      ierr = PetscPrintf(PETSC_COMM_SELF,"... Apply disturbance, solve algebraic equations ... \n");CHKERRQ(ierr);
+      ierr = PetscPrintf(PETSC_COMM_SELF,"\n... Apply disturbance, solve algebraic equations ... \n");CHKERRQ(ierr);
   }
   
   ierr = SNESSolve(snes_alg,NULL,X);CHKERRQ(ierr);
@@ -1192,7 +1188,7 @@ int main(int argc,char ** argv)
  
   user.alg_flg = PETSC_TRUE;
   if (!rank) {
-      ierr = PetscPrintf(PETSC_COMM_SELF,"... Disturbance period ... \n");CHKERRQ(ierr);
+      ierr = PetscPrintf(PETSC_COMM_SELF,"\n... Disturbance period ... \n");CHKERRQ(ierr);
   }
   ierr = TSSolve(ts,X);CHKERRQ(ierr);
   
@@ -1202,7 +1198,7 @@ int main(int argc,char ** argv)
   user.alg_flg = PETSC_FALSE;
   /* Solve the algebraic equations */
   if (!rank) {
-      ierr = PetscPrintf(PETSC_COMM_SELF,"... Remove fault, solve algebraic equations ... \n");CHKERRQ(ierr);
+      ierr = PetscPrintf(PETSC_COMM_SELF,"\n... Remove fault, solve algebraic equations ... \n");CHKERRQ(ierr);
   }
   ierr = SNESSolve(snes_alg,NULL,X);CHKERRQ(ierr);
   ierr = SNESDestroy(&snes_alg);CHKERRQ(ierr);
@@ -1215,7 +1211,7 @@ int main(int argc,char ** argv)
 
   user.alg_flg = PETSC_FALSE;
   if (!rank) {
-      ierr = PetscPrintf(PETSC_COMM_SELF,"... Post-disturbance period ... \n");CHKERRQ(ierr);
+      ierr = PetscPrintf(PETSC_COMM_SELF,"\n... Post-disturbance period ... \n");CHKERRQ(ierr);
   }
   ierr = TSSolve(ts,X);CHKERRQ(ierr);
 
