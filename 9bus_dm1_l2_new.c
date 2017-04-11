@@ -43,7 +43,7 @@ typedef struct {
   PetscScalar TM;   /* Mechanical Torque */
 
   /* Exciter system constants */
-  PetscScalar KA ;   /* Voltage regulartor gain constant */
+  PetscScalar KA ;   /* Voltage regulator gain constant */
   PetscScalar TA;    /* Voltage regulator time constant */
   PetscScalar KE;    /* Exciter gain constant */
   PetscScalar TE;    /* Exciter time constant */
@@ -62,6 +62,22 @@ typedef struct {
   PetscScalar  vi;     /* Imaginary component of bus voltage */
 } Bus;
 
+  /* Load constants
+  We use a composite load model that describes the load and reactive powers at each time instant as follows
+  P(t) = \sum\limits_{i=0}^ld_nsegsp \ld_alphap_i*P_D0(\frac{V_m(t)}{V_m0})^\ld_betap_i
+  Q(t) = \sum\limits_{i=0}^ld_nsegsq \ld_alphaq_i*Q_D0(\frac{V_m(t)}{V_m0})^\ld_betaq_i
+  where
+    id                  - index of the load 
+    ld_nsegsp,ld_nsegsq - Number of individual load models for real and reactive power loads
+    ld_alphap,ld_alphap - Percentage contribution (weights) or loads
+    P_D0                - Real power load
+    Q_D0                - Reactive power load
+    Vm(t)              - Voltage magnitude at time t
+    Vm0                - Voltage magnitude at t = 0
+    ld_betap, ld_betaq  - exponents describing the load model for real and reactive part
+
+    Note: All loads have the same characteristic currently.
+  */
 typedef struct {
   PetscInt    id;           /* bus id */
   PetscInt    ld_nsegsp;
@@ -130,24 +146,8 @@ PetscErrorCode read_data(PetscInt nc, PetscInt ngen, PetscInt nload, PetscInt nb
   PetscScalar k1[3] = {0.0039,0.0039,0.0039};
   PetscScalar k2[3] = {1.555,1.555,1.555};  /* k1 and k2 for calculating the saturation function SE = k1*exp(k2*Efd) */
   
-  /* Load constants(10 parameter)
-  We use a composite load model that describes the load and reactive powers at each time instant as follows
-  P(t) = \sum\limits_{i=0}^ld_nsegsp \ld_alphap_i*P_D0(\frac{V_m(t)}{V_m0})^\ld_betap_i
-  Q(t) = \sum\limits_{i=0}^ld_nsegsq \ld_alphaq_i*Q_D0(\frac{V_m(t)}{V_m0})^\ld_betaq_i
-  where
-    id                  - index of the load
-    lbus                - Buses at which loads are incident 
-    ld_nsegsp,ld_nsegsq - Number of individual load models for real and reactive power loads
-    ld_alphap,ld_alphap - Percentage contribution (weights) or loads
-    P_D0                - Real power load
-    Q_D0                - Reactive power load
-    V_m(t)              - Voltage magnitude at time t
-    V_m0                - Voltage magnitude at t = 0
-    ld_betap, ld_betaq  - exponents describing the load model for real and reactive part
 
-    Note: All loads have the same characteristic currently.
-  */
-
+  /* Load constants */
    PetscScalar       PD0[3]       = {1.25,0.9,1.0};
    PetscScalar       QD0[3]       = {0.5,0.3,0.35};
    PetscScalar       ld_alphaq[3] = {1,0,0};
@@ -166,6 +166,7 @@ PetscErrorCode read_data(PetscInt nc, PetscInt ngen, PetscInt nload, PetscInt nb
    D[1] = 0.1*M[1]; 
    D[2] = 0.1*M[2];
   
+  /* Alocate memory for total number of buses, generators, loads and branches */
    ierr = PetscCalloc4(nbus*nc,&bus,ngen*nc,&gen,nload*nc,&load,nbranch*nc+(nc-1),&branch);CHKERRQ(ierr);
   
    ierr = VecGetArray(V0,&varr);CHKERRQ(ierr);
@@ -344,11 +345,14 @@ PetscErrorCode SetInitialGuess(DM networkdm, Vec X)
   PetscBool                          ghostvtex;
   Vec                                localX;
   PetscScalar                        *xarr;
-  PetscScalar                        Vr=0,Vi=0,IGr,IGi,Vm,Vm2;
-  PetscScalar                        Eqp,Edp,delta;
-  PetscScalar                        Efd,RF,VR; /* Exciter variables */
-  PetscScalar                        Id,Iq;  /* Generator dq axis currents */
-  PetscScalar                        theta,Vd,Vq,SE;
+  PetscScalar                        Vr=0,Vi=0,Vm,Vm2;  /* Terminal voltage variables */
+  PetscScalar                        IGr, IGi;          /* Generator real and imaginary current */
+  PetscScalar                        Eqp,Edp,delta;     /* Generator variables */
+  PetscScalar                        Efd,RF,VR;         /* Exciter variables */
+  PetscScalar                        Vd,Vq;             /* Generator dq axis voltages */
+  PetscScalar                        Id,Iq;             /* Generator dq axis currents */
+  PetscScalar                        theta;             /* Generator phase angle */
+  PetscScalar                        SE;
   DMNetworkComponentGenericDataType  *arr;
   
   PetscFunctionBegin;
@@ -506,7 +510,7 @@ PetscErrorCode FormIFunction(TS ts,PetscReal t,Vec X,Vec Xdot,Vec F,Userctx *use
     Load         *load;
     PetscBool    ghostvtex;
     PetscInt     numComps;
-    PetscScalar  Yffr,Yffi;
+    PetscScalar  Yffr,Yffi; /* Real and imaginary fault admittances */
     PetscScalar  Vm,Vm2,Vm0;
     PetscScalar  Vr0=0,Vi0=0;
     PetscScalar  PD,QD;
@@ -982,8 +986,12 @@ int main(int argc,char ** argv)
   PetscInt       eStart,eEnd,vStart,vEnd;
   PetscInt       genj,loadj;
   PetscInt       m=0,n=0;
-  PetscInt       nc = 1;  /* Default no. of copies */ 
-  PetscInt       ngen=0,nbus=0,nbranch=0,nload=0,neqs_net=0;
+  PetscInt       nc = 1;    /* No. of copies (default = 1) */ 
+  PetscInt       ngen=0;    /* No. of generators in the 9 bus system */
+  PetscInt       nbus=0;    /* No. of buses in the 9 bus system */
+  PetscInt       nbranch=0; /* No. of branches in the 9 bus system */
+  PetscInt       nload=0;   /* No. of loads in the 9 bus system */
+  PetscInt       neqs_net=0;/* No. of algebraic equations in the 9 bus system */
   PetscInt       componentkey[4];
   PetscMPIInt    size,rank;
   Vec            X,F,F_alg,Xdot,V0;
@@ -1109,6 +1117,7 @@ int main(int argc,char ** argv)
 
   ierr = SetInitialGuess(networkdm,X);CHKERRQ(ierr);
   
+  /* Options for fault simulation */
   ierr = PetscOptionsBegin(PETSC_COMM_WORLD,NULL,"Transient stability fault options","");CHKERRQ(ierr);
   {
      user.tfaulton  = 0.02;
