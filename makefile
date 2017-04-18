@@ -24,7 +24,7 @@ run9bus:
            ${RM} -f 9bus.tmp
 
 run9bus_2:
-	-@${MPIEXEC} -n 3 ./9bus_dm1_l2_new -ts_monitor -snes_converged_reason -alg_snes_converged_reason > 9bus.tmp 2>&1;         \
+	-@${MPIEXEC} -n 3 ./9bus_dm1_l2_new -ts_monitor -snes_converged_reason -alg_snes_converged_reason -alg_snes_monitor > 9bus.tmp 2>&1;         \
            if (${DIFF} output/9bus.out 9bus.tmp) then true; \
            else printf "${PWD}\nPossible problem with 9bus, diffs above\n=========================================\n"; fi; \
            ${RM} -f 9bus.tmp

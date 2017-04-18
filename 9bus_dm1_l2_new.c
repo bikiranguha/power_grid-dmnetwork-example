@@ -366,75 +366,75 @@ PetscErrorCode SetInitialGuess(DM networkdm, Vec X)
   ierr = VecGetArray(localX,&xarr);CHKERRQ(ierr);
   ierr = DMNetworkGetComponentDataArray(networkdm,&arr);CHKERRQ(ierr);
   
-    for (v = vStart; v < vEnd; v++) {
-        ierr = DMNetworkIsGhostVertex(networkdm,v,&ghostvtex);CHKERRQ(ierr);
-        if (ghostvtex) continue;
+  for (v = vStart; v < vEnd; v++) {
+    ierr = DMNetworkIsGhostVertex(networkdm,v,&ghostvtex);CHKERRQ(ierr);
+    if (ghostvtex) continue;
         
-        ierr = DMNetworkGetVariableOffset(networkdm,v,&offset);CHKERRQ(ierr);
-        ierr = DMNetworkGetNumComponents(networkdm,v,&numComps);CHKERRQ(ierr);
-        for (j=0; j < numComps; j++) {
-           ierr = DMNetworkGetComponentTypeOffset(networkdm,v,j,&key,&offsetd);CHKERRQ(ierr);
-           if (key == 1) {
-             bus = (Bus*)(arr+offsetd);
+    ierr = DMNetworkGetVariableOffset(networkdm,v,&offset);CHKERRQ(ierr);
+    ierr = DMNetworkGetNumComponents(networkdm,v,&numComps);CHKERRQ(ierr);
+    for (j=0; j < numComps; j++) {
+      ierr = DMNetworkGetComponentTypeOffset(networkdm,v,j,&key,&offsetd);CHKERRQ(ierr);
+      if (key == 1) {
+        bus = (Bus*)(arr+offsetd);
              
-             xarr[offset]   = bus->vr;
-             xarr[offset+1] = bus->vi;
+        xarr[offset]   = bus->vr;
+        xarr[offset+1] = bus->vi;
              
-             Vr = bus->vr;
-             Vi = bus->vi;
-           } else if(key == 2) {
-                    gen = (Gen*)(arr+offsetd);
+        Vr = bus->vr;
+        Vi = bus->vi;
+      } else if(key == 2) {
+        gen = (Gen*)(arr+offsetd);
                     
-                    Vm  = PetscSqrtScalar(Vr*Vr + Vi*Vi); 
-                    Vm2 = Vm*Vm;
-                    /* Real part of gen current */
-                    IGr = (Vr*gen->PG + Vi*gen->QG)/Vm2; 
-                    /* Imaginary part of gen current */
-                    IGi = (Vi*gen->PG - Vr*gen->QG)/Vm2; 
+        Vm  = PetscSqrtScalar(Vr*Vr + Vi*Vi); 
+        Vm2 = Vm*Vm;
+        /* Real part of gen current */
+        IGr = (Vr*gen->PG + Vi*gen->QG)/Vm2; 
+        /* Imaginary part of gen current */
+        IGi = (Vi*gen->PG - Vr*gen->QG)/Vm2; 
 
-                    /* Machine angle */
-                    delta = atan2(Vi+gen->Xq*IGr,Vr-gen->Xq*IGi); 
-                    theta = PETSC_PI/2.0 - delta;
+        /* Machine angle */
+        delta = atan2(Vi+gen->Xq*IGr,Vr-gen->Xq*IGi); 
+        theta = PETSC_PI/2.0 - delta;
                     
-                    /* d-axis stator current */
-                    Id = IGr*PetscCosScalar(theta) - IGi*PetscSinScalar(theta); 
+        /* d-axis stator current */
+        Id = IGr*PetscCosScalar(theta) - IGi*PetscSinScalar(theta); 
                     
-                    /* q-axis stator current */
-                    Iq = IGr*PetscSinScalar(theta) + IGi*PetscCosScalar(theta); 
+        /* q-axis stator current */
+        Iq = IGr*PetscSinScalar(theta) + IGi*PetscCosScalar(theta); 
 
-                    Vd = Vr*PetscCosScalar(theta) - Vi*PetscSinScalar(theta);
-                    Vq = Vr*PetscSinScalar(theta) + Vi*PetscCosScalar(theta);
+        Vd = Vr*PetscCosScalar(theta) - Vi*PetscSinScalar(theta);
+        Vq = Vr*PetscSinScalar(theta) + Vi*PetscCosScalar(theta);
                     
-                    /* d-axis transient EMF */
-                    Edp = Vd + gen->Rs*Id - gen->Xqp*Iq; 
+        /* d-axis transient EMF */
+        Edp = Vd + gen->Rs*Id - gen->Xqp*Iq; 
                     
-                    /* q-axis transient EMF */
-                    Eqp = Vq + gen->Rs*Iq + gen->Xdp*Id; 
+        /* q-axis transient EMF */
+        Eqp = Vq + gen->Rs*Iq + gen->Xdp*Id; 
 
-                    gen->TM = gen->PG;
-                    idx     = offset+2;
+        gen->TM = gen->PG;
+        idx     = offset+2;
                     
-                    xarr[idx]   = Eqp;
-                    xarr[idx+1] = Edp;
-                    xarr[idx+2] = delta;
-                    xarr[idx+3] = w_s;
-                    xarr[idx+4] = Id;
-                    xarr[idx+5] = Iq;
+        xarr[idx]   = Eqp;
+        xarr[idx+1] = Edp;
+        xarr[idx+2] = delta;
+        xarr[idx+3] = w_s;
+        xarr[idx+4] = Id;
+        xarr[idx+5] = Iq;
 
-                    /* Exciter */
-                    Efd = Eqp + (gen->Xd - gen->Xdp)*Id;
-                    SE  = gen->k1*PetscExpScalar(gen->k2*Efd);
-                    VR  = gen->KE*Efd + SE;
-                    RF  = gen->KF*Efd/gen->TF;
+        /* Exciter */
+        Efd = Eqp + (gen->Xd - gen->Xdp)*Id;
+        SE  = gen->k1*PetscExpScalar(gen->k2*Efd);
+        VR  = gen->KE*Efd + SE;
+        RF  = gen->KF*Efd/gen->TF;
 
-                    xarr[idx+6] = Efd;
-                    xarr[idx+7] = RF;
-                    xarr[idx+8] = VR;
+        xarr[idx+6] = Efd;
+        xarr[idx+7] = RF;
+        xarr[idx+8] = VR;
 
-                    gen->Vref = Vm + (VR/gen->KA);
-           }
-        }
+        gen->Vref = Vm + (VR/gen->KA);
+      }
     }
+  }
   ierr = VecRestoreArray(localX,&xarr);CHKERRQ(ierr);
   ierr = DMLocalToGlobalBegin(networkdm,localX,ADD_VALUES,X);CHKERRQ(ierr);
   ierr = DMLocalToGlobalEnd(networkdm,localX,ADD_VALUES,X);CHKERRQ(ierr);
@@ -464,9 +464,9 @@ PetscErrorCode ri2dq(PetscScalar Fr,PetscScalar Fi,PetscScalar delta,PetscScalar
   PetscFunctionReturn(0);
 }
 
- /* Computes F(t,U,U_t) where F() = 0 is the DAE to be solved. */
- #undef __FUNCT__
- #define __FUNCT__ "FormIFunction"
+/* Computes F(t,U,U_t) where F() = 0 is the DAE to be solved. */
+#undef __FUNCT__
+#define __FUNCT__ "FormIFunction"
 PetscErrorCode FormIFunction(TS ts,PetscReal t,Vec X,Vec Xdot,Vec F,Userctx *user)
 {
   PetscErrorCode                     ierr;
@@ -739,8 +739,7 @@ PetscErrorCode AlgFunction (SNES snes, Vec X, Vec F, void *ctx)
   PetscInt       vfrom,vto,offsetfrom,offsetto;
   PetscInt       v,vStart,vEnd,e;
   PetscScalar    *farr;
-  Userctx        *user=(Userctx*)ctx;
-  
+  Userctx        *user=(Userctx*)ctx; 
   const PetscScalar *xarr;
   DMNetworkComponentGenericDataType *arr;  
 
@@ -982,21 +981,18 @@ PetscErrorCode AlgFunction (SNES snes, Vec X, Vec F, void *ctx)
 int main(int argc,char ** argv)
 {
   PetscErrorCode ierr;
-  PetscInt       i,j,*edgelist= NULL;
-  PetscInt       eStart,eEnd,vStart,vEnd;
-  PetscInt       genj,loadj;
-  PetscInt       m=0,n=0;
+  PetscInt       i,j,*edgelist= NULL,eStart,eEnd,vStart,vEnd;
+  PetscInt       genj,loadj,m=0,n=0,componentkey[4];
   PetscInt       nc = 1;    /* No. of copies (default = 1) */ 
   PetscInt       ngen=0;    /* No. of generators in the 9 bus system */
   PetscInt       nbus=0;    /* No. of buses in the 9 bus system */
   PetscInt       nbranch=0; /* No. of branches in the 9 bus system */
   PetscInt       nload=0;   /* No. of loads in the 9 bus system */
   PetscInt       neqs_net=0;/* No. of algebraic equations in the 9 bus system */
-  PetscInt       componentkey[4];
   PetscMPIInt    size,rank;
   Vec            X,F,F_alg,Xdot,V0;
   TS             ts;
-  SNES           snes_alg;
+  SNES           snes_alg,snes;
   PetscViewer    Xview,Ybusview;
   Mat            Ybus; /* Network admittance matrix */
   Bus            *bus;
@@ -1006,6 +1002,8 @@ int main(int argc,char ** argv)
   DM             networkdm;
   PetscLogStage  stage1;
   Userctx        user;
+  KSP            ksp;
+  PC             pc;
   
   ierr = PetscInitialize(&argc,&argv,"petscoptions",help);CHKERRQ(ierr);
   ierr = PetscOptionsGetInt(NULL,NULL,"-nc",&nc,NULL);CHKERRQ(ierr);
@@ -1119,31 +1117,26 @@ int main(int argc,char ** argv)
   
   /* Options for fault simulation */
   ierr = PetscOptionsBegin(PETSC_COMM_WORLD,NULL,"Transient stability fault options","");CHKERRQ(ierr);
-  {
-     user.tfaulton  = 0.02;
-     user.tfaultoff = 0.05;
-     user.Rfault    = 0.0001;
-     user.faultbus  = 8;
-     ierr           = PetscOptionsReal("-tfaulton","","",user.tfaulton,&user.tfaulton,NULL);CHKERRQ(ierr);
-     ierr           = PetscOptionsReal("-tfaultoff","","",user.tfaultoff,&user.tfaultoff,NULL);CHKERRQ(ierr);
-     ierr           = PetscOptionsInt("-faultbus","","",user.faultbus,&user.faultbus,NULL);CHKERRQ(ierr);
-     user.t0        = 0.0;
-     user.tmax      = 0.1;
-     ierr           = PetscOptionsReal("-t0","","",user.t0,&user.t0,NULL);CHKERRQ(ierr);
-     ierr           = PetscOptionsReal("-tmax","","",user.tmax,&user.tmax,NULL);CHKERRQ(ierr);
+  user.tfaulton  = 0.02;
+  user.tfaultoff = 0.05;
+  user.Rfault    = 0.0001;
+  user.faultbus  = 8;
+  ierr           = PetscOptionsReal("-tfaulton","","",user.tfaulton,&user.tfaulton,NULL);CHKERRQ(ierr);
+  ierr           = PetscOptionsReal("-tfaultoff","","",user.tfaultoff,&user.tfaultoff,NULL);CHKERRQ(ierr);
+  ierr           = PetscOptionsInt("-faultbus","","",user.faultbus,&user.faultbus,NULL);CHKERRQ(ierr);
+  user.t0        = 0.0;
+  user.tmax      = 0.1;
+  ierr           = PetscOptionsReal("-t0","","",user.t0,&user.t0,NULL);CHKERRQ(ierr);
+  ierr           = PetscOptionsReal("-tmax","","",user.tmax,&user.tmax,NULL);CHKERRQ(ierr);
         
-     for (i = 0; i < 18*nc; i++) {
-       user.ybusfault[i] = 0;
-     }
-     user.ybusfault[user.faultbus*2+1] = 1/user.Rfault;
+  for (i = 0; i < 18*nc; i++) {
+    user.ybusfault[i] = 0;
   }
+  user.ybusfault[user.faultbus*2+1] = 1/user.Rfault;
   ierr = PetscOptionsEnd();CHKERRQ(ierr);
   
   /* Setup TS solver                                           */
   /*--------------------------------------------------------*/
-  SNES snes;
-  KSP  ksp;
-  PC   pc;
   ierr = TSCreate(PETSC_COMM_WORLD,&ts);CHKERRQ(ierr);
   ierr = TSSetDM(ts,(DM)networkdm);CHKERRQ(ierr);
   ierr = TSSetType(ts,TSCN);CHKERRQ(ierr);
@@ -1164,9 +1157,8 @@ int main(int argc,char ** argv)
   
   /* Prefault period */
   if (!rank) {
-      ierr = PetscPrintf(PETSC_COMM_SELF,"... Prefault period ... \n");CHKERRQ(ierr);
+    ierr = PetscPrintf(PETSC_COMM_SELF,"... (1) Prefault period ... \n");CHKERRQ(ierr);
   }
-  
   ierr = TSSolve(ts,X);CHKERRQ(ierr);
 
   /* Create the nonlinear solver for solving the algebraic system */
@@ -1184,9 +1176,8 @@ int main(int argc,char ** argv)
   
   /* Solve the algebraic equations */
   if (!rank) {
-      ierr = PetscPrintf(PETSC_COMM_SELF,"\n... Apply disturbance, solve algebraic equations ... \n");CHKERRQ(ierr);
+    ierr = PetscPrintf(PETSC_COMM_SELF,"\n... (2) Apply disturbance, solve algebraic equations ... \n");CHKERRQ(ierr);
   }
-  
   ierr = SNESSolve(snes_alg,NULL,X);CHKERRQ(ierr);
   
   /* Disturbance period */
@@ -1197,7 +1188,7 @@ int main(int argc,char ** argv)
  
   user.alg_flg = PETSC_TRUE;
   if (!rank) {
-      ierr = PetscPrintf(PETSC_COMM_SELF,"\n... Disturbance period ... \n");CHKERRQ(ierr);
+    ierr = PetscPrintf(PETSC_COMM_SELF,"\n... (3) Disturbance period ... \n");CHKERRQ(ierr);
   }
   ierr = TSSolve(ts,X);CHKERRQ(ierr);
   
@@ -1207,7 +1198,7 @@ int main(int argc,char ** argv)
   user.alg_flg = PETSC_FALSE;
   /* Solve the algebraic equations */
   if (!rank) {
-      ierr = PetscPrintf(PETSC_COMM_SELF,"\n... Remove fault, solve algebraic equations ... \n");CHKERRQ(ierr);
+    ierr = PetscPrintf(PETSC_COMM_SELF,"\n... (4) Remove fault, solve algebraic equations ... \n");CHKERRQ(ierr);
   }
   ierr = SNESSolve(snes_alg,NULL,X);CHKERRQ(ierr);
   ierr = SNESDestroy(&snes_alg);CHKERRQ(ierr);
@@ -1220,7 +1211,7 @@ int main(int argc,char ** argv)
 
   user.alg_flg = PETSC_FALSE;
   if (!rank) {
-      ierr = PetscPrintf(PETSC_COMM_SELF,"\n... Post-disturbance period ... \n");CHKERRQ(ierr);
+    ierr = PetscPrintf(PETSC_COMM_SELF,"\n... (5) Post-disturbance period ... \n");CHKERRQ(ierr);
   }
   ierr = TSSolve(ts,X);CHKERRQ(ierr);
 

@@ -1,14 +1,16 @@
-... Prefault period ... 
+... (1) Prefault period ... 
 0 TS dt 0.01 time 0.
   Nonlinear solve converged due to CONVERGED_SNORM_RELATIVE iterations 1
 1 TS dt 0.01 time 0.01
   Nonlinear solve converged due to CONVERGED_SNORM_RELATIVE iterations 1
 2 TS dt 0.01 time 0.02
 
-... Apply disturbance, solve algebraic equations ... 
+... (2) Apply disturbance, solve algebraic equations ... 
+  0 SNES Function norm 1.032256483425e+04 
+  1 SNES Function norm 8.835586056306e-07 
 Nonlinear alg_ solve converged due to CONVERGED_FNORM_RELATIVE iterations 1
 
-... Disturbance period ... 
+... (3) Disturbance period ... 
 2 TS dt 0.01 time 0.02
   Nonlinear solve converged due to CONVERGED_FNORM_RELATIVE iterations 2
 3 TS dt 0.01 time 0.03
@@ -17,10 +19,12 @@ Nonlinear alg_ solve converged due to CONVERGED_FNORM_RELATIVE iterations 1
   Nonlinear solve converged due to CONVERGED_FNORM_RELATIVE iterations 2
 5 TS dt 0.01 time 0.05
 
-... Remove fault, solve algebraic equations ... 
+... (4) Remove fault, solve algebraic equations ... 
+  0 SNES Function norm 8.708577736518e+00 
+  1 SNES Function norm 8.802226225625e-09 
 Nonlinear alg_ solve converged due to CONVERGED_FNORM_RELATIVE iterations 1
 
-... Post-disturbance period ... 
+... (5) Post-disturbance period ... 
 5 TS dt 0.01 time 0.05
   Nonlinear solve converged due to CONVERGED_FNORM_RELATIVE iterations 2
 6 TS dt 0.01 time 0.06
